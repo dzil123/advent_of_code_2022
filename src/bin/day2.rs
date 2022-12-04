@@ -70,9 +70,9 @@ impl Round {
 }
 
 fn main() {
-    let data1: Vec<Round> = DATA.split_terminator("\n").map(Round::from_1).collect();
+    let data1: Vec<Round> = DATA.split_terminator('\n').map(Round::from_1).collect();
     dbg!(data1.iter().map(|round| round.score()).sum::<i32>());
 
-    let data2: Vec<Round> = DATA.split_terminator("\n").map(Round::from_2).collect();
+    let data2: Vec<Round> = DATA.split_terminator('\n').map(Round::from_2).collect();
     dbg!(data2.iter().map(|round| round.score()).sum::<i32>());
 }

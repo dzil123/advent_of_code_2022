@@ -13,7 +13,7 @@ fn priority(data: &str) -> u32 {
 }
 
 fn main() {
-    let rucksacks: Vec<&str> = DATA.split_terminator("\n").collect();
+    let rucksacks: Vec<&str> = DATA.split_terminator('\n').collect();
 
     let data1: String = rucksacks
         .iter()
