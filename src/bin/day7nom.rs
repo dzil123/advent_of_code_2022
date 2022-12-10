@@ -2,7 +2,7 @@ const DATA: &str = include_str!("res/day71.txt");
 
 mod parser {
     use nom::bytes::complete::is_a;
-    use nom::character::complete::{char, newline};
+    use nom::character::complete::{char, newline, u32};
     use nom::combinator::eof;
     use nom::multi::separated_list0;
     use nom::sequence::{pair, separated_pair, terminated};
@@ -47,7 +47,7 @@ mod parser {
     }
 
     fn ls_entry_file(input: &str) -> IResult<&str, (u32, &str)> {
-        let file_size = map_res(digit1, str::parse::<u32>);
+        let file_size = u32;
         let file_name = take_while1(|c: char| c.is_alphabetic() || c == '.');
         separated_pair(file_size, char(' '), file_name)(input)
     }
