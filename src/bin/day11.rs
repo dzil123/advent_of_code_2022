@@ -25,6 +25,7 @@ impl std::fmt::Debug for Monkey {
     }
 }
 
+#[allow(dead_code, unused_imports, unused_variables)]
 mod parser {
     use nom::{
         branch::alt,
