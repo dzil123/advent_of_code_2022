@@ -2,15 +2,15 @@ use std::collections::{HashMap, VecDeque};
 
 const DATA: &str = include_str!("res/day12.txt");
 
-fn part1(
+fn run(
     slope: &[u8],
     (width, height): (usize, usize),
-    start: (usize, usize),
+    starts: &[(usize, usize)],
     end: (usize, usize),
 ) -> Option<usize> {
     let mut visited: HashMap<(usize, usize), usize> = HashMap::new();
     let mut queue = VecDeque::new();
-    queue.push_back((0, start));
+    queue.extend(starts.iter().map(|&pos| (0, pos)));
 
     while let Some((cost, pos)) = queue.pop_front() {
         if let Some(&seen) = visited.get(&pos) {
@@ -73,9 +73,6 @@ fn main() {
     let start = start.unwrap();
     let end = end.unwrap();
 
-    let part1 = |start| part1(&slope, (width, height), start, end);
-
-    dbg!(part1(start));
-
-    dbg!(part2_candidates.into_iter().filter_map(part1).min());
+    dbg!(run(&slope, (width, height), &[start], end));
+    dbg!(run(&slope, (width, height), &part2_candidates, end));
 }
