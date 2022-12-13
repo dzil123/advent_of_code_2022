@@ -49,8 +49,9 @@ mod parser {
     use nom::{
         branch::alt,
         bytes::complete::tag,
-        character::complete::{multispace0, u32},
-        combinator::{all_consuming, verify},
+        character::complete::{multispace0, newline, u32},
+        combinator::{all_consuming, cut, verify},
+        error::{context, convert_error, ContextError, ParseError, VerboseError},
         multi::{many1, separated_list0},
         sequence::{delimited, preceded, separated_pair, terminated},
         Finish, IResult, Parser,
@@ -58,27 +59,41 @@ mod parser {
 
     use super::Entry;
 
-    fn entry(input: &str) -> IResult<&str, Entry> {
+    trait Err<'a>: ParseError<&'a str> + ContextError<&'a str> {}
+    impl<'a, T> Err<'a> for T where T: ParseError<&'a str> + ContextError<&'a str> {}
+
+    fn entry<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Entry, E> {
         let num = u32.map(Entry::Num);
         let list_inside = separated_list0(tag(","), entry);
         let list = delimited(tag("["), list_inside, tag("]")).map(Entry::List);
-        let mut value = alt((num, list));
-        value(input)
+        let value = alt((num, list));
+        context("entry", value)(input)
     }
 
-    fn packet(input: &str) -> IResult<&str, Entry> {
-        verify(entry, |e| matches!(e, Entry::List(_)))(input)
+    fn packet<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Entry, E> {
+        let packet = verify(entry, |e| matches!(e, Entry::List(_)));
+        context("packet", packet)(input)
     }
 
-    fn packet_pair(input: &str) -> IResult<&str, (Entry, Entry)> {
-        preceded(multispace0, separated_pair(packet, tag("\n"), packet))(input)
+    fn packet_pair<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, (Entry, Entry), E> {
+        let packet_pair = preceded(
+            multispace0,
+            separated_pair(packet, cut(newline), cut(packet)),
+        );
+        context("packet_pair", packet_pair)(input)
+    }
+
+    fn verbose<'a, O>(parser: impl Parser<&'a str, O, VerboseError<&'a str>>, input: &'a str) -> O {
+        let mut parser = all_consuming(terminated(parser, multispace0));
+        match parser.parse(input).finish() {
+            Ok((_, res)) => res,
+            Err(e) => panic!("{}", convert_error(input, e)),
+        }
     }
 
     pub fn parse(input: &str) -> Vec<(Entry, Entry)> {
         let parser = many1(packet_pair);
-        let res = all_consuming(terminated(parser, multispace0))(input);
-
-        res.finish().unwrap().1
+        verbose(parser, input)
     }
 }
 
