@@ -1,8 +1,7 @@
-const DATA: &str = include_str!("res/day15.txt");
-
+use regex;
 use std::collections::HashSet;
 
-use regex;
+const DATA: &str = include_str!("res/day15.txt");
 
 fn parse() -> Vec<((i32, i32), (i32, i32))> {
     let re = format!(
