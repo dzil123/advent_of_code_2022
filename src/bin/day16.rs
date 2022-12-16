@@ -64,45 +64,82 @@ fn shortest_distance(map: &Map, good_valves: &[Valve]) -> ShortestDistance {
     shortest_distance
 }
 
+#[derive(Debug, Clone)]
+struct Agent {
+    current: Valve,
+    awake_time: usize,
+}
+
 #[derive(Debug)]
-struct State {
+struct State<const N: usize> {
     remaining: Vec<Valve>,
     time_left: usize,
-    current: Valve,
+    agents: [Agent; N],
     score: usize,
 }
 
-fn solve(good_valves: &[Valve], shortest_distance: &ShortestDistance, map: &Map) -> usize {
+fn solve<const N: usize>(
+    init_time: usize,
+    good_valves: &[Valve],
+    shortest_distance: &ShortestDistance,
+    map: &Map,
+) -> usize {
     let mut queue = VecDeque::new();
     queue.push_back(State {
         remaining: good_valves.to_vec(),
-        time_left: 30,
-        current: START_VALVE,
+        time_left: init_time,
+        agents: std::array::from_fn(|_| Agent {
+            current: START_VALVE,
+            awake_time: 0,
+        }),
         score: 0,
     });
     let mut best_score = 0;
+    let mut count = 0;
 
     while let Some(state) = queue.pop_front() {
+        count += 1;
+        if count % 1000000 == 0 {
+            dbg!(best_score, count, queue.len());
+        }
         best_score = best_score.max(state.score);
 
-        for &candidate in &state.remaining {
-            let distance = 1 + *shortest_distance.get(&(state.current, candidate)).unwrap();
-            if distance >= state.time_left {
-                continue;
-            }
-            let remaining = state.time_left - distance;
+        if let Some((agent_idx, agent)) = state
+            .agents
+            .iter()
+            .enumerate()
+            .find(|(_, agent)| agent.awake_time == 0)
+        {
+            for &candidate in &state.remaining {
+                let distance = 1 + *shortest_distance.get(&(agent.current, candidate)).unwrap();
+                let remaining_time = state.time_left.saturating_sub(distance);
 
-            queue.push_back(State {
-                remaining: state
-                    .remaining
-                    .iter()
-                    .copied()
-                    .filter(|&x| x != candidate)
-                    .collect(),
-                time_left: remaining,
-                current: candidate,
-                score: state.score + (map.get(&candidate).unwrap().0 as usize * remaining),
-            });
+                let mut agents: [Agent; N] = state.agents.clone();
+                agents[agent_idx] = Agent {
+                    current: candidate,
+                    awake_time: distance,
+                };
+
+                let time_passed = agents.iter().map(|agent| agent.awake_time).min().unwrap();
+                if time_passed >= state.time_left {
+                    continue;
+                }
+                for agent in &mut agents {
+                    agent.awake_time -= time_passed;
+                }
+
+                queue.push_front(State {
+                    remaining: state
+                        .remaining
+                        .iter()
+                        .copied()
+                        .filter(|&x| x != candidate)
+                        .collect(),
+                    time_left: state.time_left - time_passed,
+                    agents,
+                    score: state.score + (map.get(&candidate).unwrap().0 as usize * remaining_time),
+                });
+            }
         }
     }
 
@@ -119,5 +156,6 @@ fn main() {
 
     let shortest_distance = shortest_distance(&map, &good_valves);
 
-    dbg!(solve(&good_valves, &shortest_distance, &map));
+    dbg!(solve::<1>(30, &good_valves, &shortest_distance, &map));
+    dbg!(solve::<2>(26, &good_valves, &shortest_distance, &map));
 }
