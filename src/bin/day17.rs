@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-const DATA: &str = include_str!("res/day17.txt");
+const DATA: &str = include_str!("res/day171.txt");
 const WIDTH: usize = 7;
 
 // bottom to top, already in starting position
@@ -24,7 +24,11 @@ const ROCKS: [Rock; 5] = [
 
 const EMPTY_ROCK: Rock = [0; 4];
 
-type World = Vec<u8>;
+#[derive(Default)]
+struct World {
+    vec: Vec<u8>,
+    height: usize, // height that was cut off from the front of the vec
+}
 
 #[derive(Debug, Copy, Clone)]
 enum Dir {
@@ -57,8 +61,9 @@ fn try_move(world: &World, rock: Rock, rock_pos: usize, dir: Dir) -> Option<Rock
     });
 
     let hit_world = world
+        .vec
         .iter()
-        .skip(rock_pos)
+        .skip(rock_pos - world.height)
         .zip(new_rock.iter())
         .any(|(&world, &rock)| world & rock != 0);
     // dbg!(hit_world);
@@ -75,8 +80,9 @@ fn can_move_down(world: &World, rock: Rock, rock_pos: usize) -> bool {
     }
 
     let cant_move_down = world
+        .vec
         .iter()
-        .skip(rock_pos - 1)
+        .skip(rock_pos - world.height - 1)
         .zip(rock.iter())
         .any(|(&world, &rock)| world & rock != 0);
     // dbg!(cant_move_down);
@@ -96,7 +102,12 @@ fn apply_movement(world: &mut World, rock: &mut Rock, rock_pos: &mut usize, dir:
         *rock_pos -= 1;
         false
     } else {
-        for (world, rock) in world.iter_mut().skip(*rock_pos).zip(rock.iter()) {
+        for (world, rock) in world
+            .vec
+            .iter_mut()
+            .skip(*rock_pos - world.height)
+            .zip(rock.iter())
+        {
             *world |= rock;
         }
         true
@@ -105,18 +116,25 @@ fn apply_movement(world: &mut World, rock: &mut Rock, rock_pos: &mut usize, dir:
 
 fn next_rock_pos(world: &World) -> usize {
     world
+        .vec
         .iter()
         .rposition(|&line| line != 0)
         .map(|x| x + 4)
         .unwrap_or(3)
+        + world.height
 }
 
-fn world_height(world: &World) -> usize {
+fn world_height_raw(world: &World) -> usize {
     world
+        .vec
         .iter()
         .rposition(|&line| line != 0)
         .map(|x| x + 1)
         .unwrap_or(0)
+}
+
+fn world_height(world: &World) -> usize {
+    dbg!(world_height_raw(world)) + dbg!(world.height)
 }
 
 fn parse() -> impl Iterator<Item = Dir> {
@@ -131,7 +149,7 @@ fn parse() -> impl Iterator<Item = Dir> {
 }
 
 fn print_world(world: &World, rock: &Rock, rock_pos: usize) {
-    for (line_idx, &line) in world.iter().enumerate().rev() {
+    for (line_idx, &line) in world.vec.iter().enumerate().rev() {
         for col_idx in 0..7 {
             let mut ch = '.';
             if line & (0b10_0000_00 >> col_idx) != 0 {
@@ -153,19 +171,26 @@ fn print_world(world: &World, rock: &Rock, rock_pos: usize) {
     println!();
 }
 
+const MAX_WORLD_VEC_LEN: usize = 4;
+
 fn main() {
     let mut dirs = parse();
     let mut rocks = ROCKS.iter().cycle();
 
-    let mut world = vec![];
+    let mut world = World::default();
 
+    // for idx in 0..1_000_000_000_000u64 {
+    //     if idx % 40364 == 0 {
+    //         dbg!(idx, world_height(&world));
+    //     }
     for _ in 0..2022 {
         let mut rock = rocks.next().unwrap().clone();
         let mut rock_pos = next_rock_pos(&world);
 
-        let new_len = rock_pos + rock.len();
-        if new_len > world.len() {
-            world.resize(new_len, 0);
+        let new_len = rock_pos + MAX_WORLD_VEC_LEN - world.height;
+        if new_len > world.vec.len() {
+            world.vec.resize(new_len, 0);
+            // world.drain(range)
         }
 
         loop {
@@ -175,8 +200,17 @@ fn main() {
                 break;
             }
         }
+
+        let before_len = world_height(&world);
+        if let Some(cut) = dbg!(before_len).checked_sub(MAX_WORLD_VEC_LEN + 1) {
+            world.vec.drain(..cut);
+            world.height += dbg!(cut);
+            assert_eq!(before_len, world_height(&world));
+        }
+
         // println!("rest");
         // print_world(&world, &EMPTY_ROCK, rock_pos);
+        dbg!(world.height);
     }
 
     dbg!(world_height(&world));

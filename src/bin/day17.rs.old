@@ -1,0 +1,37 @@
+#![allow(dead_code)]
+
+use bitvec::prelude::*;
+
+const DATA: &str = include_str!("res/day171.txt");
+const WIDTH: usize = 7;
+
+type Line = BitArr!(for WIDTH, in u8);
+
+const ROCKS: [&'static [Line]; 2] = [
+    &[bitarr![const u8, LocalBits; 0, 0, 1, 1, 1, 1]],
+    &[
+        bitarr![const u8, LocalBits; 0, 0, 0, 1],
+        bitarr![const u8, LocalBits; 0, 0, 1, 1, 1],
+        bitarr![const u8, LocalBits; 0, 0, 0, 1],
+    ],
+];
+
+// type World: Vec<[]
+
+#[derive(Debug, Copy, Clone)]
+enum Dir {
+    Left,
+    Right,
+}
+
+// fn apply_movement(world: &World, rock: &mut World, dir: Dir) {
+//     dbg!()
+// }
+
+fn main() {
+    let x = Line::default();
+    dbg!(x);
+    // dbg!(x << 1);
+
+    dbg!(ROCKS);
+}
