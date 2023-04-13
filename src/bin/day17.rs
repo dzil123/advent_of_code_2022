@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::sync::Mutex;
+
 const DATA: &str = include_str!("res/day171.txt");
 const WIDTH: usize = 7;
 
@@ -137,7 +139,7 @@ fn world_height(world: &World) -> usize {
     dbg!(world_height_raw(world)) + dbg!(world.height)
 }
 
-fn parse() -> impl Iterator<Item = Dir> {
+fn parse() -> impl Iterator<Item = (usize, Dir)> {
     DATA.trim()
         .bytes()
         .map(|ch| match ch {
@@ -145,6 +147,7 @@ fn parse() -> impl Iterator<Item = Dir> {
             b'>' => Dir::Right,
             _ => panic!(),
         })
+        .enumerate()
         .cycle()
 }
 
@@ -173,6 +176,8 @@ fn print_world(world: &World, rock: &Rock, rock_pos: usize) {
 
 const MAX_WORLD_VEC_LEN: usize = 4;
 
+static DEBUG: Mutex<bool> = Mutex::new(false);
+
 fn main() {
     let mut dirs = parse();
     let mut rocks = ROCKS.iter().cycle();
@@ -183,7 +188,7 @@ fn main() {
     //     if idx % 40364 == 0 {
     //         dbg!(idx, world_height(&world));
     //     }
-    for _ in 0..2022 {
+    for i in 0..2022 {
         let mut rock = rocks.next().unwrap().clone();
         let mut rock_pos = next_rock_pos(&world);
 
@@ -194,24 +199,43 @@ fn main() {
         }
 
         loop {
-            // print_world(&world, &rock, rock_pos);
-            let dir = dirs.next().unwrap();
+            if *DEBUG.lock().unwrap() {
+                print_world(&world, &rock, rock_pos);
+            }
+            let (dir_i, dir) = dirs.next().unwrap();
+            dbg!(dir_i);
             if apply_movement(&mut world, &mut rock, &mut rock_pos, dir) {
                 break;
             }
         }
 
-        let before_len = world_height(&world);
-        if let Some(cut) = dbg!(before_len).checked_sub(MAX_WORLD_VEC_LEN + 1) {
-            world.vec.drain(..cut);
-            world.height += dbg!(cut);
-            assert_eq!(before_len, world_height(&world));
-        }
+        // let before_len = world_height(&world);
+        // if let Some(cut) = dbg!(before_len).checked_sub(MAX_WORLD_VEC_LEN + 1) {
+        //     world.vec.drain(..cut);
+        //     world.height += dbg!(cut);
+        //     assert_eq!(before_len, world_height(&world));
+        // }
 
         // println!("rest");
-        // print_world(&world, &EMPTY_ROCK, rock_pos);
-        dbg!(world.height);
+        if *DEBUG.lock().unwrap() {
+            print_world(&world, &EMPTY_ROCK, rock_pos);
+            dbg!(world.height);
+        }
+        println!("{:?}", (i, world_height_raw(&world)));
+        // *DEBUG.lock().unwrap() = i > 8;
+        if *DEBUG.lock().unwrap() {
+            print_world(&world, &EMPTY_ROCK, rock_pos);
+        }
     }
 
-    dbg!(world_height(&world));
+    // dbg!(world_height(&world));
+}
+
+#[test]
+fn test_wind() {
+    let mut dirs = parse();
+
+    for (i, d) in dirs.take(20).enumerate() {
+        println!("{:?}", (i, d));
+    }
 }

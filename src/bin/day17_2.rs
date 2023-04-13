@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicBool, Mutex},
+};
 
 struct Config {
     data: &'static str,
@@ -6,8 +9,8 @@ struct Config {
 }
 
 const fn get_config() -> Config {
-    // let data = include_str!("res/day171.txt");
-    let data = include_str!("res/day17.txt");
+    let data = include_str!("res/day171.txt");
+    // let data = include_str!("res/day17.txt");
 
     let iterations = 2022;
     // let iterations = 1_000_000_000_000;
@@ -82,6 +85,7 @@ impl WindIter<'_> {
     }
 
     fn next(&mut self) -> Dir {
+        // dbg!(self.idx);
         let ret = self.wind.data[self.idx];
         self.idx = (self.idx + 1) % self.wind.data.len();
         ret
@@ -89,27 +93,63 @@ impl WindIter<'_> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
+struct WorldState {
+    top: [u8; 8],
+}
+
+impl Default for WorldState {
+    fn default() -> Self {
+        Self { top: [u8::MAX; 8] }
+    }
+}
+
+#[derive(Clone, Default)]
 struct World {
-    top: [u8; 4],
+    world: [u8; 16],
 }
 
 impl World {
-    fn print(&self, rock: &FallingRock) {
-        for (line_idx, &line) in self.top.iter().enumerate().rev() {
+    fn reset(&mut self, state: &WorldState) {
+        write_bytes(&mut self.world, 0);
+        self.world[..8].copy_from_slice(&state.top);
+    }
+
+    fn save(&self) -> WorldState {
+        let top_idx = self
+            .world
+            .iter()
+            .rposition(|&line| line != 0)
+            .unwrap_or(0)
+            .max(8);
+        // dbg!(top_idx);
+        WorldState {
+            top: self.world[(top_idx - 7)..=top_idx].try_into().unwrap(),
+        }
+    }
+
+    fn print(&self, rock: Option<&FallingRock>) {
+        if !*DEBUG.lock().unwrap() {
+            return;
+        }
+
+        for (line_idx, &line) in self.world.iter().enumerate().rev() {
             for col_idx in 0..7 {
                 let mut ch = '.';
                 if line & (0b10_0000_00 >> col_idx) != 0 {
                     ch = '#';
                 }
-                if rock.pos <= line_idx && line_idx < (rock.pos + 4) {
-                    let rock_line = rock.rock[line_idx - rock.pos];
-                    if rock_line & (0b10_0000_00 >> col_idx) != 0 {
-                        if ch != '.' {
-                            panic!();
+                if let Some(rock) = rock {
+                    if rock.pos <= line_idx && line_idx < (rock.pos + 4) {
+                        let rock_line = rock.rock[line_idx - rock.pos];
+                        if rock_line & (0b10_0000_00 >> col_idx) != 0 {
+                            if ch != '.' {
+                                panic!();
+                            }
+                            ch = '@';
                         }
-                        ch = '@';
                     }
                 }
+
                 print!("{}", ch);
             }
             println!();
@@ -118,15 +158,9 @@ impl World {
     }
 }
 
-impl Default for World {
-    fn default() -> Self {
-        Self { top: [u8::MAX; 4] }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 struct State {
-    world: World,
+    world: WorldState,
     wind_idx: u16,
     rock_idx: u8,
 }
@@ -167,10 +201,10 @@ impl FallingRock {
     fn new(rock: Rock) -> Self {
         FallingRock {
             rock,
-            pos: ROCK_LEN * 2,
+            pos: ROCK_LEN * 3 - 1,
         }
     }
-    fn move_dir(&mut self, world: &[u8], dir: Dir) {
+    fn move_dir(&mut self, world: &World, dir: Dir) {
         let mask = match dir {
             Dir::Left => 0b10_0000_00,
             Dir::Right => 0b00_0000_11,
@@ -190,6 +224,7 @@ impl FallingRock {
         });
 
         let hit_world = world
+            .world
             .iter()
             .skip(self.pos)
             .zip(new_rock.iter())
@@ -202,21 +237,22 @@ impl FallingRock {
         self.rock = new_rock;
     }
 
-    fn can_move_down(&self, world: &[u8]) -> bool {
+    fn can_move_down(&self, world: &World) -> bool {
         self.pos != 0
             && world
+                .world
                 .iter()
                 .skip(self.pos - 1)
                 .zip(self.rock.iter())
                 .all(|(&world, &rock)| world & rock == 0)
     }
 
-    fn move_down(mut self, world: &mut [u8]) -> Option<Self> {
+    fn move_down(mut self, world: &mut World) -> Option<Self> {
         if self.can_move_down(world) {
             self.pos -= 1;
             Some(self)
         } else {
-            for (world, rock) in world.iter_mut().skip(self.pos).zip(self.rock.iter()) {
+            for (world, rock) in world.world.iter_mut().skip(self.pos).zip(self.rock.iter()) {
                 *world |= rock;
             }
             None
@@ -226,31 +262,36 @@ impl FallingRock {
 
 #[derive(Default)]
 struct Algorithm {
-    world: Box<[u8; ROCK_LEN * 3]>,
+    world: World,
     wind: Wind,
 }
 
 impl Evaluator for Algorithm {
     fn eval(&mut self, state: State) -> (State, usize) {
-        let world = &mut *self.world;
-        write_bytes(world, 0);
-        world[..ROCK_LEN].copy_from_slice(&state.world.top);
+        self.world.reset(&state.world);
 
         let mut rock_holder = Some(FallingRock::new(ROCKS[state.rock_idx as usize]));
         let mut wind = self.wind.iter(state.wind_idx);
 
-        let mut added_height = 5 + ROCK_HEIGHTS[state.rock_idx as usize];
+        let mut added_height = 9 + ROCK_HEIGHTS[state.rock_idx as usize];
         while let Some(mut rock) = rock_holder.take() {
-            rock.move_dir(world, wind.next());
-            rock_holder = rock.move_down(world);
             added_height -= 1;
+            // dbg!(added_height);
+            if added_height == 0 {
+                // dbg!();
+                break;
+            }
+            // dbg!(added_height);
+            self.world.print(Some(&rock));
+            rock.move_dir(&self.world, wind.next());
+            rock_holder = rock.move_down(&mut self.world);
         }
+        // dbg!(added_height);
+        self.world.print(None);
 
         (
             State {
-                world: World {
-                    top: self.world[..4].try_into().unwrap(),
-                },
+                world: self.world.save(),
                 wind_idx: wind.finish(),
                 rock_idx: (state.rock_idx + 1) % (ROCKS.len() as u8),
             },
@@ -259,6 +300,8 @@ impl Evaluator for Algorithm {
     }
 }
 
+static DEBUG: Mutex<bool> = Mutex::new(false);
+
 fn main() {
     let evaluator = Algorithm::default();
     // let evaluator = Memoizer::new(evaluator);
@@ -266,11 +309,27 @@ fn main() {
     let mut state = State::default();
     let mut height = 0;
     let mut evaluator = evaluator;
-    for iteration in 0..get_config().iterations {
+    for i in 0..get_config().iterations {
+        // *DEBUG.lock().unwrap() = i > 8;
         let (new_state, added_height) = evaluator.eval(state);
         state = new_state;
-        height += added_height;
+        height += added_height.saturating_sub(5);
+        println!("{:?}", (i, height));
+        if *DEBUG.lock().unwrap() {
+            dbg!(added_height);
+        }
     }
 
-    dbg!(height);
+    // dbg!(height);
+}
+
+#[test]
+fn test_wind() {
+    let wind = Wind::default();
+    let mut dirs = wind.iter(0);
+
+    for i in 0..20 {
+        let d = dirs.next();
+        println!("{:?}", (i, d));
+    }
 }
