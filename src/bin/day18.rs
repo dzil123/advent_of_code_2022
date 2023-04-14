@@ -13,8 +13,8 @@ impl Storage for HashSet<Pos> {
 }
 
 fn parse() -> impl Iterator<Item = Pos> {
-    // let data = include_str!("res/day18.txt");
-    let data = include_str!("res/day181.txt");
+    let data = include_str!("res/day18.txt");
+    // let data = include_str!("res/day181.txt");
     // let data = "1,1,1\n2,1,1";
 
     data.trim().split_ascii_whitespace().map(|line| {
@@ -55,7 +55,7 @@ fn main() {
     let mut queue = vec![(0, 0, 0)];
     while let Some(next) = queue.pop() {
         for n in neighborhood(next) {
-            if n.0 < 0 || n.1 < 0 || n.2 < 0 || n.0 > 24 || n.1 > 24 || n.2 > 24 {
+            if n.0 < -1 || n.1 < -1 || n.2 < -1 || n.0 > 24 || n.1 > 24 || n.2 > 24 {
                 continue;
             }
             if cubes.contains(&n) {
@@ -71,8 +71,8 @@ fn main() {
         .iter()
         .map(|&pos| {
             neighborhood(pos)
-                .filter(|face| !cubes.contains(face))
-                // .filter(|face| !cubes.contains(face) && seen.contains(face))
+                // .filter(|face| !cubes.contains(face))
+                .filter(|face| !cubes.contains(face) && seen.contains(face))
                 .count()
         })
         .sum();
