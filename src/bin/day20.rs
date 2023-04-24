@@ -1,66 +1,63 @@
-use std::{collections::HashSet, ops::Rem};
+// const INPUT: &str = "1 2 -3 3 -2 0 4";
+const INPUT: &str = include_str!("res/day20.txt");
 
-// const INPUT: (usize, &str) = (7, "1 2 -3 3 -2 0 4");
-const INPUT: (usize, &str) = (5000, include_str!("res/day20.txt"));
+// const PART: (u8, i64) = (1, 1);
+const PART: (u8, i64) = (10, 811589153);
 
-fn parse() -> [i16; INPUT.0] {
+fn parse() -> Vec<i64> {
     INPUT
-        .1
         .split_whitespace()
         .map(str::parse)
         .map(Result::unwrap)
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
+        .map(transform)
+        .collect()
 }
 
 fn dbg(x: &impl std::fmt::Debug) {
     println!("{:?}", x);
 }
 
-fn index_of(data: &[i16], item: i16) -> usize {
+fn index_of<T: Copy + Eq>(data: &[T], item: T) -> usize {
     data.iter().position(|&x| x == item).unwrap()
+}
+
+fn transform(x: i64) -> i64 {
+    x * PART.1
+}
+
+fn print_data(data: &[usize], orig_data: &[i64]) {
+    dbg(&data
+        .iter()
+        .map(|&i| orig_data[i as usize])
+        .collect::<Vec<_>>());
 }
 
 fn main() {
     let orig_data = parse();
-    let mut data = orig_data.to_vec();
-    dbg(&data);
+    let len = orig_data.len() as i64;
 
-    // data.sort();
-    // dbg!(&data);
-    // panic!();
+    let mut data = (0..orig_data.len()).collect::<Vec<usize>>();
+    print_data(&data, &orig_data);
 
-    assert!(data.iter().copied().collect::<HashSet<i16>>().len() == data.len());
+    for _ in 0..PART.0 {
+        for (i0, &item) in orig_data.iter().enumerate() {
+            let i = index_of(&data, i0);
+            data.remove(i);
 
-    let len = INPUT.0 as i16;
-    for item in orig_data {
-        let i = index_of(&data, item);
+            let new_index = (i as i64 + item).rem_euclid(len - 1);
+            data.insert(new_index as usize, i0);
 
-        data.remove(i);
-        let mut new_index = i as i16 + item;
-        new_index += (new_index - 1).div_euclid(len);
-        // if new_index == 0 {
-        //     new_index -= 1;
-        // }
-        let new_index = new_index.rem_euclid(len);
-        data.insert(new_index as usize, item);
-        dbg(&data);
-
-        // dbg!(i);
-        // let i2 = (i - 1).rem_euclid(len);
-        // dbg!(i2);
-        // let i2 = i2 as usize;
-        // dbg!(&data[0..i2]);
-        // dbg!(&data[i2]);
-        // dbg!(&data[(i2 + 1)..]);
-        // println!();
+            // print_data(&data, &orig_data);
+        }
+        print_data(&data, &orig_data);
+        println!();
     }
 
-    let k = index_of(&data, 0) as i16;
+    let k = index_of(&data, index_of(&orig_data, 0)) as i64;
     dbg!([1000, 2000, 3000]
         .into_iter()
-        .map(|x: i16| data[(k + x).rem_euclid(len) as usize])
+        .map(|x: i64| data[(k + x).rem_euclid(len) as usize])
+        .map(|x| orig_data[x as usize])
         .inspect(dbg)
-        .sum::<i16>());
+        .sum::<i64>());
 }
